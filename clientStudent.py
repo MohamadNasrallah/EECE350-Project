@@ -31,23 +31,26 @@ class AUBRegistrarStudentClient:
             return {"status": "error", "message": "Communication error"}
 
     def login(self):
+        """Authenticate the student and immediately show their current schedule."""
         while True:
             username = input("Username: ")
             password = getpass.getpass("Password: ")
-            
+
             response = self.send_request({
                 "command": "login",
                 "username": username,
                 "password": password
             })
-            
+
             if response.get("status") == "success" and response.get("role") == "student":
                 self.username = username
-                print("Login successful!")
+                print("Login successful!\n")
+                # NEW ➜ display the list (or 'No courses registered yet')
+                self.view_registered_courses()
                 return True
             else:
-                print("Invalid credentials. Please try again.")
-
+                print("Invalid credentials. Please try again.\n")
+                
     def list_courses(self):
         response = self.send_request({
             "command": "list_courses"
@@ -68,6 +71,28 @@ class AUBRegistrarStudentClient:
                 print(f"{course['course_name']:<20} {course['capacity']:<10} {course['remaining']:<10} {course['schedule']:<20}")
         else:
             print("Error listing courses:", response.get("message"))
+
+    def view_registered_courses(self):
+        response = self.send_request({
+            "command": "get_registered_courses",
+            "username": self.username
+        })
+        
+        if response.get("status") == "success":
+            registered_courses = response.get("registered_courses", [])
+            if not registered_courses:
+                print("\nNo courses registered yet")
+                return
+            
+            print("\nYour Registered Courses:")
+            print("-" * 80)
+            print(f"{'Course Name':<20}")
+            print("-" * 80)
+            
+            for course in registered_courses:
+                print(f"{course:<20}")
+        else:
+            print("Error getting registered courses:", response.get("message"))
 
     def register_course(self):
         course_name = input("Enter course name to register: ")
@@ -102,9 +127,10 @@ class AUBRegistrarStudentClient:
         print("1. List Available Courses")
         print("2. Register for a Course")
         print("3. Withdraw from a Course")
-        print("4. Exit")
+        print("4. View My Registered Courses")
+        print("5. Exit")
         
-        choice = input("\nEnter your choice (1-4): ")
+        choice = input("\nEnter your choice (1-5): ")
         return choice
 
     def run(self):
@@ -124,6 +150,8 @@ class AUBRegistrarStudentClient:
             elif choice == "3":
                 self.withdraw_course()
             elif choice == "4":
+                self.view_registered_courses()
+            elif choice == "5":
                 print("Thank you for using AUB Registrar. Goodbye!")
                 break
             else:
