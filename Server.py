@@ -28,78 +28,105 @@ class AUBRegistrarServer:
                     if not data:
                         break
                     
-                    request = json.loads(data)
-                    response = self.process_request(request, db)
-                    client_socket.send(json.dumps(response).encode())
+                    try:
+                        request = json.loads(data)
+                        print(f"Received request: {request}")  # Debug logging
+                        response = self.process_request(request, db)
+                        print(f"Sending response: {response}")  # Debug logging
+                        client_socket.send(json.dumps(response).encode())
+                    except json.JSONDecodeError as e:
+                        print(f"JSON decode error: {str(e)}")
+                        client_socket.send(json.dumps({
+                            "status": "error",
+                            "message": "Invalid request format"
+                        }).encode())
+                    except Exception as e:
+                        print(f"Error processing request: {str(e)}")
+                        client_socket.send(json.dumps({
+                            "status": "error",
+                            "message": "Internal server error"
+                        }).encode())
         except Exception as e:
             print(f"Error handling client {address}: {str(e)}")
         finally:
             client_socket.close()
-
     def process_request(self, request, db):
-        command = request.get("command")
-        username = request.get("username")
-        password = request.get("password")
-        
-        # Authentication
-        if command == "login":
-            role = db.authenticate(username, password)
-            if role:
-                return {"status": "success", "role": role}
+        """
+        Handle every incoming JSON request and return a JSON‑serialisable dict.
+        NOTE: this is now a single if/elif/else ladder so we always hit at most
+        one branch and never fall through to the generic “Invalid command”.
+        """
+        try:
+            command  = (request.get("command") or "").lower()
+            username = request.get("username")
+            password = request.get("password")
+
+            # ------------------------------------------------------------------
+            # 1) LOGIN  ─────────────────────────────────────────────────────────
+            if command == "login":
+                role = db.authenticate(username, password)
+                return ({"status": "success", "role": role}
+                        if role else
+                        {"status": "error", "message": "Invalid credentials"})
+
+            # ------------------------------------------------------------------
+            # 2) STUDENT COMMANDS  ─────────────────────────────────────────────
+            elif command == "list_courses":
+                return {"status": "success", "courses": db.get_courses()}
+
+            elif command == "get_registered_courses":
+                if not username:
+                    return {"status": "error", "message": "Username not provided"}
+                courses = db.get_student_courses(username)
+                return {"status": "success", "registered_courses": courses}
+
+            elif command == "register_course":
+                course_name = request.get("course_name")
+                ok = db.register_course(username, course_name)
+                return ({"status": "success", "message": "Course registered successfully"}
+                        if ok else
+                        {"status": "error", "message": "Cannot register for course"})
+
+            elif command == "withdraw_course":
+                course_name = request.get("course_name")
+                ok = db.withdraw_course(username, course_name)
+                return ({"status": "success", "message": "Course withdrawn successfully"}
+                        if ok else
+                        {"status": "error", "message": "Cannot withdraw from course"})
+
+            # ------------------------------------------------------------------
+            # 3) ADMIN COMMANDS  ───────────────────────────────────────────────
+            elif command == "create_course":
+                ok = db.create_course(request.get("course_name"),
+                                      request.get("capacity"),
+                                      request.get("schedule"))
+                return ({"status": "success", "message": "Course created successfully"}
+                        if ok else
+                        {"status": "error", "message": "Course already exists"})
+
+            elif command == "update_course":
+                ok = db.update_course_capacity(request.get("course_name"),
+                                               request.get("new_capacity"))
+                return ({"status": "success", "message": "Course capacity updated"}
+                        if ok else
+                        {"status": "error", "message": "Course does not exist or invalid capacity"})
+
+            elif command == "add_student":
+                ok = db.add_student(request.get("student_username"),
+                                    request.get("student_password"))
+                return ({"status": "success", "message": "Student added successfully"}
+                        if ok else
+                        {"status": "error", "message": "Student already exists"})
+
+            # ------------------------------------------------------------------
+            # 4) UNKNOWN COMMAND  ──────────────────────────────────────────────
             else:
-                return {"status": "error", "message": "Invalid credentials"}
-        
-        # Admin commands
-        if command == "create_course":
-            course_name = request.get("course_name")
-            capacity = request.get("capacity")
-            schedule = request.get("schedule")
-            
-            if db.create_course(course_name, capacity, schedule):
-                return {"status": "success", "message": "Course created successfully"}
-            else:
-                return {"status": "error", "message": "Course already exists"}
-        
-        if command == "update_course":
-            course_name = request.get("course_name")
-            new_capacity = request.get("new_capacity")
-            
-            if db.update_course_capacity(course_name, new_capacity):
-                return {"status": "success", "message": "Course capacity updated"}
-            else:
-                return {"status": "error", "message": "Course does not exist or invalid capacity"}
-        
-        if command == "add_student":
-            username = request.get("student_username")
-            password = request.get("student_password")
-            
-            if db.add_student(username, password):
-                return {"status": "success", "message": "Student added successfully"}
-            else:
-                return {"status": "error", "message": "Student already exists"}
-        
-        # Student commands
-        if command == "list_courses":
-            courses = db.get_courses()
-            return {"status": "success", "courses": courses}
-        
-        if command == "register_course":
-            course_name = request.get("course_name")
-            
-            if db.register_course(username, course_name):
-                return {"status": "success", "message": "Course registered successfully"}
-            else:
-                return {"status": "error", "message": "Cannot register for course"}
-        
-        if command == "withdraw_course":
-            course_name = request.get("course_name")
-            
-            if db.withdraw_course(username, course_name):
-                return {"status": "success", "message": "Course withdrawn successfully"}
-            else:
-                return {"status": "error", "message": "Cannot withdraw from course"}
-        
-        return {"status": "error", "message": "Invalid command"}
+                return {"status": "error", "message": "Invalid command"}
+
+        except Exception as e:
+            print(f"Error in process_request: {e}")
+            return {"status": "error", "message": "Internal server error"}
+
 
     def start(self):
         try:
@@ -125,4 +152,5 @@ if __name__ == "__main__":
     except ValueError:
         print("Port must be a number")
         sys.exit(1)
+
 
