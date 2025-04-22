@@ -23,17 +23,4 @@ Built for EECE 350 – Computer Networks (Spring 2025).
 - **Message format:** JSON  
 - **Concurrency:** One thread per client on server side  
 - **Persistence:** SQLite via `database.py`
-
-## Getting Started
-
-### Prerequisites
-
-- Python 3.7+  
-- `sqlite3` (standard with Python)  
-
-### Installation
-
-1. Clone this repo:  
-   ```bash
-   git clone https://github.com/<your‑username>/aub‑registrar.git
-   cd aub-registrar
+ 
