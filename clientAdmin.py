@@ -118,11 +118,13 @@ class AUBRegistrarAdminClient:
     def add_student(self):
         username = input("Enter student username: ")
         password = getpass.getpass("Enter student password: ")
+        full_name = input("Enter student full name: ")
         
         response = self.send_request({
             "command": "add_student",
             "student_username": username,
-            "student_password": password
+            "student_password": password,
+            "student_full_name": full_name
         })
         
         if response.get("status") == "success":
