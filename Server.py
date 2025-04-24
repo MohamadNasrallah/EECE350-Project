@@ -54,7 +54,7 @@ class AUBRegistrarServer:
         """
         Handle every incoming JSON request and return a JSON‑serialisable dict.
         NOTE: this is now a single if/elif/else ladder so we always hit at most
-        one branch and never fall through to the generic “Invalid command”.
+        one branch and never fall through to the generic "Invalid command".
         """
         try:
             command  = (request.get("command") or "").lower()
@@ -113,7 +113,8 @@ class AUBRegistrarServer:
 
             elif command == "add_student":
                 ok = db.add_student(request.get("student_username"),
-                                    request.get("student_password"))
+                                    request.get("student_password"),
+                                    request.get("student_full_name"))
                 return ({"status": "success", "message": "Student added successfully"}
                         if ok else
                         {"status": "error", "message": "Student already exists"})
@@ -152,5 +153,4 @@ if __name__ == "__main__":
     except ValueError:
         print("Port must be a number")
         sys.exit(1)
-
 
