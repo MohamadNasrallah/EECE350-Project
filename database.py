@@ -37,9 +37,18 @@ class AUBRegistrarDatabase:
             CREATE TABLE IF NOT EXISTS students (
                 username TEXT PRIMARY KEY,
                 password TEXT NOT NULL,
+                full_name TEXT NOT NULL,          -- NEW column
                 registered_courses TEXT DEFAULT '[]'  -- JSON array of course names
             )
             ''')
+
+            # One-time migration for existing databases
+            try:
+                cursor.execute(
+                    "ALTER TABLE students ADD COLUMN full_name TEXT NOT NULL DEFAULT ''"
+                )
+            except sqlite3.OperationalError:
+                pass
             
             # Create admin table
             cursor.execute('''
@@ -57,13 +66,13 @@ class AUBRegistrarDatabase:
             
             conn.commit()
 
-    def add_student(self, username: str, password: str) -> bool:
+    def add_student(self, username: str, password: str, full_name: str) -> bool:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-            INSERT INTO students (username, password)
-            VALUES (?, ?)
-            ''', (username, password))
+            INSERT INTO students (username, password, full_name)
+            VALUES (?, ?, ?)
+            ''', (username, password, full_name))
             self.conn.commit()
             return True
         except sqlite3.IntegrityError:
